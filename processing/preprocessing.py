@@ -10,8 +10,17 @@ def ham_tien_xu_ly(frame_goc):
 
     # ----- BẮT ĐẦU CODE CỦA NGƯỜI 2 -----
 
-    # Ví dụ: Tạm thời trả về ảnh gốc
-    processed_frame = frame_goc.copy()
+    anh_xam = cv2.cvtColor(frame_goc, cv2.COLOR_BGR2GRAY)
+    anh_giam_nhieu_muoi_tieu = cv2.medianBlur(anh_xam, 3)
+    anh_giam_nhieu = cv2.GaussianBlur(anh_giam_nhieu_muoi_tieu, (5, 5), 0)
+    #Sử dụng CLAHE (Contrast Limited Adaptive Histogram Equalization) để tránh tăng cường nhiễu quá mức
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    anh_tang_cuong = clahe.apply(anh_giam_nhieu)
+    kernel_sharpening = np.array([[-1, -1, -1],
+                                  [-1, 9, -1],
+                                  [-1, -1, -1]])
+    anh_sac_net = cv2.filter2D(anh_tang_cuong, -1, kernel_sharpening)
+    processed_frame = cv2.cvtColor(frame_goc, cv2.COLOR_GRAY2BGR)
 
     # ----- KẾT THÚC CODE CỦA NGƯỜI 2 -----
 
