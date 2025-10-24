@@ -2,84 +2,105 @@
 
 import cv2
 import numpy as np
-# (Người 2: Thêm các import cần thiết khác ở đây)
+
 
 def ham_tien_xu_ly(frame_goc):
-
-    print(">>> [Preprocessing] Hàm tiền xử lý đang chạy (chưa có code)...")
-
-    # ----- BẮT ĐẦU CODE CỦA NGƯỜI 2 -----
-
-    anh_xam = cv2.cvtColor(frame_goc, cv2.COLOR_BGR2GRAY)
-    anh_giam_nhieu_muoi_tieu = cv2.medianBlur(anh_xam, 3)
-    anh_giam_nhieu = cv2.GaussianBlur(anh_giam_nhieu_muoi_tieu, (5, 5), 0)
-    #Sử dụng CLAHE (Contrast Limited Adaptive Histogram Equalization) để tránh tăng cường nhiễu quá mức
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    anh_tang_cuong = clahe.apply(anh_giam_nhieu)
-    kernel_sharpening = np.array([[-1, -1, -1],
-                                  [-1, 9, -1],
-                                  [-1, -1, -1]])
-    anh_sac_net = cv2.filter2D(anh_tang_cuong, -1, kernel_sharpening)
-    processed_frame = cv2.cvtColor(frame_goc, cv2.COLOR_GRAY2BGR)
-
-    # ----- KẾT THÚC CODE CỦA NGƯỜI 2 -----
-
-    # Đảm bảo trả về một NumPy array là ảnh
-    if not isinstance(processed_frame, np.ndarray):
-        print("!!! [Lỗi Preprocessing] Hàm không trả về ảnh NumPy hợp lệ!")
-        return frame_goc # Trả về gốc nếu lỗi
-
-    return processed_frame
-
-# --- Các hàm phụ trợ khác (nếu cần) có thể viết ở dưới đây ---
-
-"""
-    >>> GỢI Ý: Thực hiện các bước tiền xử lý ảnh dưới đây <<<
-
-    Mục tiêu: Cải thiện chất lượng ảnh đầu vào (frame_goc) trước khi
-              đưa cho Người 3 (hàm nhận dạng AI).
-
-    Input: frame_goc (Ảnh màu BGR đọc từ camera/file).
-    Output: processed_frame_final (Ảnh đã xử lý, định dạng BGR hoặc Grayscale
-            - cần thống nhất với Người 3).
-
-    Các bước gợi ý (dựa trên tài liệu đã học):
-
-    Bước 1: Chuyển đổi sang ảnh xám (Grayscale Conversion).
-        - Mục đích: Đơn giản hóa ảnh, loại bỏ màu sắc, nhiều thuật toán
-          hoạt động tốt hơn trên ảnh xám.
-        - Hàm OpenCV: cv2.cvtColor(frame_goc, cv2.COLOR_BGR2GRAY)
-        - Tài liệu: Chương 1, 2.
-
-    Bước 2: Giảm nhiễu (Noise Reduction).
-        - Mục đích: Làm mượt ảnh, loại bỏ nhiễu (từ camera, ánh sáng yếu)
-          để AI nhận dạng ổn định hơn.
-        - Thuật toán gợi ý (Chương 2 - Lọc không gian):
-            - cv2.GaussianBlur(): Làm mờ mượt, hiệu quả với nhiễu chung.
-              (Nên dùng kernel 3x3 hoặc 5x5).
-            - cv2.medianBlur(): Hiệu quả với nhiễu "muối tiêu".
-              (Nên dùng kernel 3 hoặc 5).
-        - Thực hiện: Áp dụng một (hoặc cả hai) bộ lọc lên ảnh xám từ Bước 1.
-
-    Bước 3: Tăng cường tương phản (Contrast Enhancement).
-        - Mục đích: Làm rõ sự khác biệt giữa đối tượng (người) và nền,
-          đặc biệt khi ánh sáng không tốt.
-        - Thuật toán gợi ý (Chương 2 - Biến đổi mức xám):
-            - cv2.equalizeHist(): Tự động cân bằng histogram, làm rõ chi tiết
-              trong vùng tối/sáng. Rất hiệu quả và dễ dùng.
-        - Thực hiện: Áp dụng lên ảnh đã giảm nhiễu từ Bước 2.
-
-    Bước 4: Chuẩn bị ảnh Output.
-        - Thống nhất với Người 3: Hàm nhận dạng cần ảnh xám (1 kênh) hay
-          ảnh màu (BGR - 3 kênh)?
-        - Nếu cần ảnh BGR: Chuyển ảnh xám đã xử lý ở Bước 3 về BGR bằng
-          cv2.cvtColor(anh_xam_da_xu_ly, cv2.COLOR_GRAY2BGR).
-        - Nếu cần ảnh xám: Giữ nguyên kết quả từ Bước 3.
-        - Gán kết quả cuối cùng cho biến `processed_frame_final`.
-
-    Lưu ý:
-        - KHÔNG dùng các thuật toán phát hiện biên (Canny, Sobel - Chương 5)
-          hoặc biến đổi hình thái (Erosion, Dilation - Chương 3) ở bước này,
-          vì chúng có thể làm mất thông tin AI cần.
-        - Thử nghiệm các tham số (kích thước kernel) để có kết quả tốt nhất.
     """
+    Hàm tiền xử lý ảnh để cải thiện chất lượng cho nhận dạng tư thế.
+    Tự động phát hiện và xử lý ảnh thiếu sáng.
+
+    Tham số:
+        frame_goc: Ảnh đầu vào từ camera/file (BGR format)
+
+    Trả về:
+        processed_frame: Ảnh đã được xử lý (BGR format)
+    """
+    print(">>> [Preprocessing] Bắt đầu tiền xử lý ảnh...")
+
+    try:
+        if frame_goc is None or frame_goc.size == 0:
+            print("!!! [Lỗi] Ảnh đầu vào không hợp lệ!")
+            return frame_goc
+
+        gray_check = cv2.cvtColor(frame_goc, cv2.COLOR_BGR2GRAY)
+        brightness = np.mean(gray_check)
+        is_dark = brightness < 80  # Ngưỡng phát hiện ảnh tối
+
+        if is_dark:
+            print(f"   [0] Phát hiện ảnh tối (độ sáng: {brightness:.1f}) - Áp dụng xử lý đặc biệt")
+
+        working_frame = frame_goc.copy()
+
+        if is_dark:
+            hsv = cv2.cvtColor(working_frame, cv2.COLOR_BGR2HSV)
+            h, s, v = cv2.split(hsv)
+
+            brightness_boost = int((80 - brightness) * 0.8)  # Tính toán mức tăng
+            v = cv2.add(v, brightness_boost)
+
+            clahe_v = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            v = clahe_v.apply(v)
+
+            hsv_enhanced = cv2.merge([h, s, v])
+            working_frame = cv2.cvtColor(hsv_enhanced, cv2.COLOR_HSV2BGR)
+            print(f"   [1] Đã tăng độ sáng +{brightness_boost}")
+
+        gray_frame = cv2.cvtColor(working_frame, cv2.COLOR_BGR2GRAY)
+        print("   [2] Đã chuyển sang ảnh xám")
+
+        kernel_size = (5, 5) if is_dark else (3, 3) #(5, 5) cho ảnh sáng , (3, 3) cho ảnh tối
+        denoised_frame = cv2.GaussianBlur(gray_frame, kernel_size, 0)
+        print(f"   [3] Đã giảm nhiễu với kernel {kernel_size}")
+
+        # CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        # Cân bằng Histogram Thích ứng Giới hạn Độ tương phản
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        enhanced_frame = clahe.apply(denoised_frame)
+        print("   [4] Đã tăng cường tương phản với CLAHE")
+
+        sharpening_kernel = np.array([[-1, -1, -1],
+                                      [-1, 9, -1],
+                                      [-1, -1, -1]])
+        sharpened_frame = cv2.filter2D(enhanced_frame, -1, sharpening_kernel)
+        print("   [5] Đã làm sắc nét ảnh")
+
+        processed_gray = cv2.cvtColor(sharpened_frame, cv2.COLOR_GRAY2BGR)
+
+        # Xử lý màu từ ảnh gốc đã cải thiện ánh sáng
+        lab = cv2.cvtColor(working_frame, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+
+        l_clahe = clahe.apply(l)
+        lab_enhanced = cv2.merge([l_clahe, a, b])
+        color_enhanced = cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2BGR)
+
+        weight_gray = 0.4 if is_dark else 0.5
+        weight_color = 0.6 if is_dark else 0.5
+        final_frame = cv2.addWeighted(processed_gray, weight_gray, color_enhanced, weight_color, 0)
+        print(f"   [6] Đã cân bằng màu (Gray:{weight_gray} Color:{weight_color})")
+
+        print(">>> [Preprocessing] Hoàn tất tiền xử lý!")
+        return final_frame
+
+    except Exception as e:
+        print(f"!!! [Lỗi Preprocessing] Lỗi trong quá trình xử lý: {e}")
+        return frame_goc
+
+
+
+# === HÀM PHỤ TRỢ ===
+
+def resize_frame(frame, max_width=1280, max_height=720):
+
+    h, w = frame.shape[:2]
+
+    if w > max_width or h > max_height:
+        scale = min(max_width / w, max_height / h)
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+
+        resized = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        print(f"   [Resize] {w}x{h} -> {new_w}x{new_h}")
+        return resized
+
+    return frame
