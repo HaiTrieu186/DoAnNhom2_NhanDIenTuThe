@@ -5,16 +5,7 @@ import numpy as np
 
 
 def ham_tien_xu_ly(frame_goc):
-    """
-    Hàm tiền xử lý ảnh để cải thiện chất lượng cho nhận dạng tư thế.
-    Tự động phát hiện và xử lý ảnh thiếu sáng.
 
-    Tham số:
-        frame_goc: Ảnh đầu vào từ camera/file (BGR format)
-
-    Trả về:
-        processed_frame: Ảnh đã được xử lý (BGR format)
-    """
     print(">>> [Preprocessing] Bắt đầu tiền xử lý ảnh...")
 
     try:
