@@ -28,7 +28,6 @@ def ham_tien_xu_ly(frame_goc):
             brightness_boost = int((80 - brightness) * 0.8)
             v = cv2.add(v, brightness_boost)
 
-            # THAY CLAHE BẰNG LOG TRANSFORM
             v_float = v.astype(np.float32)
             v_normalized = v_float / 255.0
             v_log = np.log1p(v_normalized * 10)  # log(1 + x*10)
@@ -62,7 +61,6 @@ def ham_tien_xu_ly(frame_goc):
 
         processed_gray = cv2.cvtColor(sharpened_frame, cv2.COLOR_GRAY2BGR)
 
-        # THAY CLAHE BẰNG LOG TRANSFORM CHO ẢNH MÀU
         lab = cv2.cvtColor(working_frame, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
 
