@@ -33,10 +33,18 @@ def create_ui_widgets(root, app_commands):
 
     # --- Hiển thị kết quả ---
     result_frame = ttk.Frame(main_frame)
-    result_frame.pack(fill=tk.X, pady=10)
-    ttk.Label(result_frame, text="Kết quả:", font=('Segoe UI', 12, 'bold')).pack(side=tk.LEFT, padx=(0, 5))
-    result_label = ttk.Label(result_frame, text="...", style='Result.TLabel', width=50)
-    result_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+    result_frame.pack(fill=tk.BOTH, pady=10)
+
+    ttk.Label(result_frame, text="Kết quả:", font=('Segoe UI', 12, 'bold')).pack(anchor=tk.W)
+
+    result_label = tk.Label(result_frame, text="...",
+                            font=('Segoe UI', 11, 'italic'),
+                            foreground="navy",
+                            background="#F0F0F0",
+                            justify=tk.LEFT,
+                            wraplength=600,  # Tự động xuống dòng khi quá 600px
+                            anchor=tk.W)
+    result_label.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
 
     # --- Khung điều khiển dưới cùng ---
     bottom_frame = ttk.Frame(main_frame)
