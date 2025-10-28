@@ -44,6 +44,11 @@ except ImportError:
 class PoseApp:
     """Lớp chính điều khiển logic và trạng thái của ứng dụng."""
     def __init__(self, root_window):
+        self.apply_gamma = None
+        self.apply_contrast = None
+        self.apply_brightness = None
+        self.reset_params = None
+
         self.root = root_window
         self.cap = None                 # Đối tượng camera OpenCV
         self.recording = False          # Cờ báo camera đang chạy
@@ -57,8 +62,33 @@ class PoseApp:
             'start_cam': self.start_webcam,
             'stop_cam': self.stop_webcam,
             'capture': self.capture_image,
-            'quit': self.quit_app
+            'quit': self.quit_app,
+            'apply_gamma': self.apply_gamma,
+            'apply_contrast': self.apply_contrast,
+            'apply_brightness': self.apply_brightness,
+            'reset_params': self.reset_params
         }
+
+        def apply_gamma(self):
+            gamma_value = float(self.widgets['gamma_entry'].get())
+            # Logic xử lý gamma...
+
+        def apply_contrast(self):
+            contrast_value = float(self.widgets['contrast_entry'].get())
+            # Logic xử lý contrast...
+
+        def apply_brightness(self):
+            brightness_value = int(self.widgets['brightness_entry'].get())
+            # Logic xử lý brightness...
+
+        def reset_params(self):
+            self.widgets['gamma_entry'].delete(0, tk.END)
+            self.widgets['gamma_entry'].insert(0, "1.0")
+            self.widgets['contrast_entry'].delete(0, tk.END)
+            self.widgets['contrast_entry'].insert(0, "1.0")
+            self.widgets['brightness_entry'].delete(0, tk.END)
+            self.widgets['brightness_entry'].insert(0, "0")
+
 
         # Gọi hàm từ app_ui để tạo giao diện và lấy về các widget
         self.widgets = create_ui_widgets(self.root, commands)
