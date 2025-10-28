@@ -18,9 +18,9 @@ except ImportError as e:
     exit()
 
 try:
-    # Hàm tiền xử lý từ thư mục processing (cần file preprocessing.py)
-    from processing.preprocessing import ham_tien_xu_ly
+    from processing.preprocessing import ham_tien_xu_ly # Hàm tiền xử lý từ thư mục processing (cần file preprocessing.py)
     print(">>> Logic: Đã import 'ham_tien_xu_ly'.")
+
 except ImportError:
     messagebox.showwarning("Import Warning", "Không tìm thấy 'preprocessing.py' hoặc hàm 'ham_tien_xu_ly'.\nSẽ dùng hàm xử lý tạm thời.")
     # Hàm tạm thời nếu import lỗi
@@ -30,15 +30,14 @@ except ImportError:
         return frame
 
 try:
-    # Hàm nhận dạng từ thư mục processing (cần file pose_logic.py)
-    from processing.pose_logic import ham_nhan_dang
+    from processing.pose_logic import pose_detect # Hàm nhận dạng từ thư mục processing (cần file pose_logic.py)
     print(">>> Logic: Đã import 'ham_nhan_dang'.")
+
 except ImportError:
     messagebox.showwarning("Import Warning", "Không tìm thấy 'pose_logic.py' hoặc hàm 'ham_nhan_dang'.\nSẽ dùng hàm nhận dạng tạm thời.")
-    # Hàm tạm thời nếu import lỗi
-    def ham_nhan_dang(frame):
-        print("[LOGIC] Đang dùng hàm nhận dạng TẠM THỜI!")
-        cv2.putText(frame, "POSELOGIC MISSING", (10,60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2) # Màu đỏ
+
+    def pose_detect(frame): # Hàm tạm thời nếu import lỗi
+        cv2.putText(frame, "POSELOGIC MISSING", (10,60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
         return frame, "Lỗi Import Logic"
 # ------------------------------------------------
 
@@ -78,142 +77,148 @@ class PoseApp:
     def upload_image(self):
         """Xử lý khi nhấn nút 'Tải Ảnh Lên'."""
         print("Logic: upload_image...")
-        if self.recording: self.stop_webcam() # Dừng camera nếu đang chạy
+        if self.recording:
+            self.stop_webcam()
 
         file_path = filedialog.askopenfilename(
             title="Chọn file ảnh",
             filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp"), ("All files", "*.*")]
         )
+        if not file_path or not os.path.isfile(file_path):
+            self.widgets['filepath_label'].config(text="Chưa chọn file")
+            return
 
-        # Nếu người dùng chọn file và file đó tồn tại
-        if file_path and os.path.isfile(file_path):
-            self.widgets['filepath_label'].config(text=os.path.basename(file_path)) # Hiển thị tên file
-            try:
-                anh_goc = cv2.imread(file_path)
-                if anh_goc is not None:
-                    # Gọi hàm xử lý ảnh
-                    anh_sach = ham_tien_xu_ly(anh_goc)
-                    anh_ve_lai, ket_qua_text = ham_nhan_dang(anh_sach)
-                    # Cập nhật giao diện
-                    update_image_on_label(self.widgets['image_label'], anh_ve_lai, self.image_display_size)
-                    self.widgets['result_label'].config(text=ket_qua_text)
-                else:
-                    messagebox.showerror("Lỗi Đọc Ảnh", f"Không đọc được file:\n{file_path}")
-                    # Hiển thị lại ảnh trống và thông báo lỗi
-                    update_image_on_label(self.widgets['image_label'], self.blank_frame, self.image_display_size)
-                    self.widgets['result_label'].config(text="Lỗi tải ảnh.")
-            except Exception as e:
-                messagebox.showerror("Lỗi Xử Lý Ảnh", f"Lỗi xử lý ảnh tĩnh:\n{e}")
-                update_image_on_label(self.widgets['image_label'], self.blank_frame, self.image_display_size)
-                self.widgets['result_label'].config(text="Lỗi xử lý ảnh.")
-        else:
-            # Nếu người dùng hủy chọn file
-             self.widgets['filepath_label'].config(text="Chưa chọn file")
+        self.widgets['filepath_label'].config(text=os.path.basename(file_path))
+        try:
+            anh_goc = cv2.imread(file_path)
+            if anh_goc is None:
+                raise ValueError("Không đọc được file ảnh")
+            # Xử lý ảnh
+            anh_sach = ham_tien_xu_ly(anh_goc)
+            anh_ve_lai, ket_qua_text = pose_detect(anh_sach)
+            # Cập nhật giao diện
+            update_image_on_label(self.widgets['image_label'], anh_ve_lai, self.image_display_size)
+            self.widgets['result_label'].config(text=ket_qua_text)
+
+        except Exception as e:
+            messagebox.showerror("Lỗi Xử Lý Ảnh", f"Lỗi:\n{e}")
+            update_image_on_label(self.widgets['image_label'], self.blank_frame, self.image_display_size)
+            self.widgets['result_label'].config(text="Lỗi xử lý ảnh.")
 
     def start_webcam(self):
         """Xử lý khi nhấn nút 'Bật Camera'."""
         print("Logic: start_webcam...")
-        if self.cap is None: # Chỉ bật nếu chưa bật
-            self.cap = cv2.VideoCapture(0) # Thử cam index 0
-            if not self.cap.isOpened():
-                print("   -> Thử camera index 1...")
-                self.cap = cv2.VideoCapture(1) # Thử cam index 1
+        if self.cap is not None:
+            return
 
-            if self.cap and self.cap.isOpened():
-                self.recording = True
-                # Cập nhật trạng thái các nút
-                self.widgets['btn_cam_on'].config(state=tk.DISABLED)
-                self.widgets['btn_cam_off'].config(state=tk.NORMAL)
-                self.widgets['btn_capture'].config(state=tk.NORMAL)
-                self.widgets['result_label'].config(text="CAMERA ĐANG BẬT...")
-                print("   -> Camera đã bật. Bắt đầu vòng lặp frame.")
-                self.update_frame() # Bắt đầu vòng lặp cập nhật frame
-            else:
-                messagebox.showerror("Lỗi Camera", "Không thể mở webcam!")
-                self.cap = None # Reset về None nếu không mở được
+        # Thử mở camera (index 0 hoặc 1)
+        for cam_index in [0, 1]:
+            self.cap = cv2.VideoCapture(cam_index)
+            if self.cap.isOpened():
+                print(f"   -> Camera index {cam_index} đã bật.")
+                break
+            self.cap.release()
+            self.cap = None
+
+        if self.cap is None or not self.cap.isOpened():
+            messagebox.showerror("Lỗi Camera", "Không thể mở webcam!")
+            return
+
+        # Cập nhật trạng thái
+        self.recording = True
+        self._update_camera_buttons(camera_on=True)
+        self.widgets['result_label'].config(text="CAMERA ĐANG BẬT...")
+        print("   -> Bắt đầu vòng lặp frame.")
+        self.update_frame()
 
     def stop_webcam(self, show_blank=True):
         """Xử lý khi nhấn nút 'Dừng Camera' hoặc khi cần dừng camera."""
         print(f"Logic: stop_webcam (show_blank={show_blank})...")
         was_recording = self.recording
-        self.recording = False # Tắt cờ camera
-        # Hủy lịch trình gọi lại hàm update_frame (nếu có)
+        self.recording = False
+
+        # Hủy lịch trình cập nhật frame
         if self.after_id:
             self.root.after_cancel(self.after_id)
             self.after_id = None
-        # Giải phóng camera nếu đang được sử dụng
+
+        # Giải phóng camera
         if self.cap is not None:
             self.cap.release()
             self.cap = None
-            if was_recording: print("   -> Camera đã dừng và giải phóng.")
-        # Cập nhật trạng thái các nút
-        self.widgets['btn_cam_on'].config(state=tk.NORMAL)
-        self.widgets['btn_cam_off'].config(state=tk.DISABLED)
-        self.widgets['btn_capture'].config(state=tk.DISABLED)
-        # Cập nhật text trạng thái
-        if was_recording: self.widgets['result_label'].config(text="CAMERA ĐÃ TẮT")
-        # Hiển thị ảnh trống nếu được yêu cầu
+            if was_recording:
+                print("   -> Camera đã dừng và giải phóng.")
+
+        # Cập nhật giao diện
+        self._update_camera_buttons(camera_on=False)
+        if was_recording:
+            self.widgets['result_label'].config(text="CAMERA ĐÃ TẮT")
         if show_blank:
             update_image_on_label(self.widgets['image_label'], self.blank_frame, self.image_display_size)
 
     def capture_image(self):
         """Xử lý khi nhấn nút 'Chụp Ảnh'."""
         print("Logic: capture_image...")
-        if self.recording and self.cap is not None:
-            ret, frame = self.cap.read() # Đọc frame hiện tại từ camera
-            if ret:
-                frame = cv2.flip(frame, 1) # Lật ảnh
-                print("   -> Đã chụp frame. Dừng camera tạm thời và xử lý...")
-                # Dừng camera nhưng không hiện ảnh trống ngay lập tức
-                self.stop_webcam(show_blank=False)
-                try:
-                    # Gọi xử lý cho frame tĩnh vừa chụp
-                    anh_sach = ham_tien_xu_ly(frame)
-                    anh_ve_lai, ket_qua_text = ham_nhan_dang(anh_sach)
-                    # Cập nhật giao diện với kết quả xử lý ảnh tĩnh
-                    update_image_on_label(self.widgets['image_label'], anh_ve_lai, self.image_display_size)
-                    self.widgets['result_label'].config(text=f"(Ảnh chụp) {ket_qua_text}")
-                    print(f"   -> Xử lý ảnh chụp xong.")
-                except Exception as e:
-                    messagebox.showerror("Lỗi Xử Lý Ảnh Chụp", f"Lỗi:\n{e}")
-                    update_image_on_label(self.widgets['image_label'], frame, self.image_display_size) # Hiện ảnh gốc nếu lỗi
-                    self.widgets['result_label'].config(text="Lỗi xử lý ảnh chụp.")
-            else:
-                messagebox.showerror("Lỗi Camera", "Không thể đọc frame để chụp!")
-                self.stop_webcam() # Dừng hẳn nếu đọc lỗi
-        else:
-             print("   -> Camera chưa bật để chụp.") # Thông báo nếu camera chưa bật
+        if not self.recording or self.cap is None:
+            print("   -> Camera chưa bật để chụp.")
+            return
 
+        ret, frame = self.cap.read()
+        if not ret:
+            messagebox.showerror("Lỗi Camera", "Không thể đọc frame để chụp!")
+            self.stop_webcam()
+            return
+
+        frame = cv2.flip(frame, 1)
+        print("   -> Đã chụp frame. Dừng camera tạm thời và xử lý...")
+        self.stop_webcam(show_blank=False)
+
+        try:
+            # Xử lý frame đã chụp
+            anh_sach = ham_tien_xu_ly(frame)
+            anh_ve_lai, ket_qua_text = pose_detect(anh_sach)
+
+            # Cập nhật giao diện
+            update_image_on_label(self.widgets['image_label'], anh_ve_lai, self.image_display_size)
+            self.widgets['result_label'].config(text=f"(Ảnh chụp) {ket_qua_text}")
+            print("   -> Xử lý ảnh chụp xong.")
+
+        except Exception as e:
+            messagebox.showerror("Lỗi Xử Lý Ảnh Chụp", f"Lỗi:\n{e}")
+            update_image_on_label(self.widgets['image_label'], frame, self.image_display_size)
+            self.widgets['result_label'].config(text="Lỗi xử lý ảnh chụp.")
 
     def update_frame(self):
         """Vòng lặp chính để đọc frame từ camera, xử lý và hiển thị."""
-        # Kiểm tra nếu cần dừng (do nhấn nút Dừng hoặc lỗi)
         if not self.recording or self.cap is None:
             print("Logic: update_frame dừng.")
             return
 
-        ret, frame = self.cap.read() # Đọc frame
-        if ret:
-            frame = cv2.flip(frame, 1) # Lật frame
-            try:
-                # Gọi xử lý
-                frame_sach = ham_tien_xu_ly(frame)
-                frame_ve_lai, ket_qua_text = ham_nhan_dang(frame_sach)
-                # Cập nhật UI
-                update_image_on_label(self.widgets['image_label'], frame_ve_lai, self.image_display_size)
-                self.widgets['result_label'].config(text=ket_qua_text)
-            except Exception as e:
-                print(f"[LỖI] Xử lý frame camera: {e}")
-                update_image_on_label(self.widgets['image_label'], frame, self.image_display_size) # Hiện gốc nếu lỗi
-                self.widgets['result_label'].config(text=f"LỖI XỬ LÝ")
-
-            # Lên lịch để gọi lại hàm này sau 15ms
-            # Giá trị 15ms tương đương khoảng 66 FPS (1000/15), có thể tăng lên nếu cần (vd: 30ms ~ 33 FPS)
-            self.after_id = self.root.after(15, self.update_frame)
-        else:
+        ret, frame = self.cap.read()
+        if not ret:
             print("[Lỗi] Không đọc được frame từ webcam trong vòng lặp!")
-            self.stop_webcam() # Tự động dừng nếu đọc lỗi
+            self.stop_webcam()
             messagebox.showwarning("Lỗi Camera", "Mất kết nối với webcam!")
+            return
+
+        frame = cv2.flip(frame, 1)
+
+        try:
+            # Xử lý frame
+            frame_sach = ham_tien_xu_ly(frame)
+            frame_ve_lai, ket_qua_text = pose_detect(frame_sach)
+
+            # Cập nhật UI
+            update_image_on_label(self.widgets['image_label'], frame_ve_lai, self.image_display_size)
+            self.widgets['result_label'].config(text=ket_qua_text)
+
+        except Exception as e:
+            print(f"[LỖI] Xử lý frame camera: {e}")
+            update_image_on_label(self.widgets['image_label'], frame, self.image_display_size)
+            self.widgets['result_label'].config(text="LỖI XỬ LÝ")
+
+        # Lên lịch gọi lại sau 15ms (~66 FPS)
+        self.after_id = self.root.after(15, self.update_frame)
 
     def quit_app(self):
         """Dọn dẹp và đóng ứng dụng."""
@@ -222,3 +227,14 @@ class PoseApp:
         print("   -> Đang đóng cửa sổ...")
         self.root.destroy() # Đóng cửa sổ Tkinter
         print("--- ỨNG DỤNG ĐÃ ĐÓNG ---")
+
+    def _update_camera_buttons(self, camera_on):
+        """Cập nhật trạng thái các nút liên quan đến camera."""
+        if camera_on:
+            self.widgets['btn_cam_on'].config(state=tk.DISABLED)
+            self.widgets['btn_cam_off'].config(state=tk.NORMAL)
+            self.widgets['btn_capture'].config(state=tk.NORMAL)
+        else:
+            self.widgets['btn_cam_on'].config(state=tk.NORMAL)
+            self.widgets['btn_cam_off'].config(state=tk.DISABLED)
+            self.widgets['btn_capture'].config(state=tk.DISABLED)
