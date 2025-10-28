@@ -42,7 +42,7 @@ POSE_PAIRS = [ ["Neck","RShoulder"],
                ["LEye","LEar"]
                ]
 
-img=cv2.imread("testPose.jpg")
+img=cv2.imread("../image/testPose.jpg")
 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 def pose_detect(frame):
