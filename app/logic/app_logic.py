@@ -90,7 +90,9 @@ class PoseApp:
 
         self.widgets['filepath_label'].config(text=os.path.basename(file_path))
         try:
-            anh_goc = cv2.imread(file_path)
+            with open(file_path, "rb") as f:
+                file_bytes = np.fromfile(f, dtype=np.uint8)
+            anh_goc = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
             if anh_goc is None:
                 raise ValueError("Không đọc được file ảnh")
             # Xử lý ảnh
