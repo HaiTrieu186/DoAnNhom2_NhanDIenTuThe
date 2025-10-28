@@ -27,6 +27,7 @@ def main():
     # Chạy app
     try:
         root = tk.Tk()
+        root.title("Ứng dụng nhận diện tư thế người nhóm 2")
         app = PoseApp(root)
         root.mainloop()
     except Exception as e:
