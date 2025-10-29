@@ -5,30 +5,13 @@ import os
 import numpy as np
 
 # Import các hàm utils và ui
-try:
-    from app.utils.app_utils import update_image_on_label
-    from app.ui.app_ui import create_ui_widgets
-except ImportError as e:
-    messagebox.showerror("Lỗi", f"Không tìm thấy app_utils hoặc app_ui:\n{e}")
-    exit()
+from app.utils.app_utils import update_image_on_label
+from app.ui.app_ui import create_ui_widgets
 
-# Import hàm xử lý (nếu có)
-try:
-    from processing.preprocessing import ham_tien_xu_ly
-except ImportError:
-    # Hàm xử lý tạm thời nếu import lỗi
-    def ham_tien_xu_ly(frame):
-        cv2.putText(frame, "PREPROC MISSING", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 165, 255), 2)
-        return frame
-
-# Import hàm logic (nếu có)
-try:
-    from processing.pose_logic import pose_detect
-except ImportError:
-    # Hàm logic tạm thời nếu import lỗi
-    def pose_detect(frame):
-        cv2.putText(frame, "POSELOGIC MISSING", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-        return frame, "Lỗi Import Logic"
+# Import hàm xử lý
+from processing.preprocessing import ham_tien_xu_ly
+from processing.basic_process import gamma_process, adjust_contrast, adjust_brightness
+from processing.pose_logic import pose_detect
 
 
 class PoseApp:
@@ -40,8 +23,19 @@ class PoseApp:
         self.after_id = None  # ID cho vòng lặp camera
         self.widgets = {}
 
+        # Lưu ảnh gốc để xử lý
+        self.current_original_image = None
+        self.current_processed_image = None
+        self.pose_detected = False  # Cờ đánh dấu đã nhận dạng tư thế
+        self.before_pose_image = None  # Lưu ảnh trước khi nhận dạng (đã xử lý gamma/contrast/brightness)
+
         # Gán các hàm cho nút bấm
         commands = {
+            'apply_gamma': self.apply_gamma,
+            'apply_contrast': self.apply_contrast,
+            'apply_brightness': self.apply_brightness,
+            'apply_pose_detect': self.apply_pose_detect,
+            'reset_params': self.reset_params,
             'upload': self.upload_image,
             'start_cam': self.start_webcam,
             'stop_cam': self.stop_webcam,
@@ -58,6 +52,125 @@ class PoseApp:
 
         # Xử lý nút X (đóng cửa sổ)
         self.root.protocol("WM_DELETE_WINDOW", self.quit_app)
+
+    # ==================== CÁC HÀM XỬ LÝ ẢNH CƠ BẢN ====================
+
+    def apply_gamma(self):
+        """Áp dụng biến đổi Gamma lên ảnh hiện tại"""
+        if self.current_processed_image is None:
+            messagebox.showwarning("Cảnh báo", "Chưa có ảnh để xử lý!")
+            return
+
+        try:
+            gamma_value = float(self.widgets['gamma_entry'].get())
+            if gamma_value <= 0:
+                raise ValueError("Gamma phải > 0")
+
+            # Xử lý ảnh hiện tại (đè lên)
+            processed = gamma_process(self.current_processed_image, gamma_value)
+            self.current_processed_image = processed
+
+            # Cập nhật hiển thị
+            update_image_on_label(self.widgets['image_label'], processed, self.image_display_size)
+            self.widgets['result_label'].config(text=f"Đã áp dụng Gamma: {gamma_value}")
+
+        except ValueError as e:
+            messagebox.showerror("Lỗi", f"Giá trị Gamma không hợp lệ!\n{e}")
+
+    def apply_contrast(self):
+        """Áp dụng điều chỉnh tương phản lên ảnh hiện tại"""
+        if self.current_processed_image is None:
+            messagebox.showwarning("Cảnh báo", "Chưa có ảnh để xử lý!")
+            return
+
+        try:
+            contrast_value = float(self.widgets['contrast_entry'].get())
+            if contrast_value < 0:
+                raise ValueError("Tương phản phải >= 0")
+
+            # Xử lý ảnh hiện tại (đè lên)
+            processed = adjust_contrast(self.current_processed_image, contrast_value)
+            self.current_processed_image = processed
+
+            # Cập nhật hiển thị
+            update_image_on_label(self.widgets['image_label'], processed, self.image_display_size)
+            self.widgets['result_label'].config(text=f"Đã áp dụng Tương phản: {contrast_value}")
+
+        except ValueError as e:
+            messagebox.showerror("Lỗi", f"Giá trị Tương phản không hợp lệ!\n{e}")
+
+    def apply_brightness(self):
+        """Áp dụng điều chỉnh độ sáng lên ảnh hiện tại"""
+        if self.current_processed_image is None:
+            messagebox.showwarning("Cảnh báo", "Chưa có ảnh để xử lý!")
+            return
+
+        try:
+            brightness_value = int(self.widgets['brightness_entry'].get())
+
+            # Xử lý ảnh hiện tại (đè lên)
+            processed = adjust_brightness(self.current_processed_image, brightness_value)
+            self.current_processed_image = processed
+
+            # Cập nhật hiển thị
+            update_image_on_label(self.widgets['image_label'], processed, self.image_display_size)
+            self.widgets['result_label'].config(text=f"Đã áp dụng Độ sáng: {brightness_value:+d}")
+
+        except ValueError as e:
+            messagebox.showerror("Lỗi", f"Giá trị Độ sáng không hợp lệ!\n{e}")
+
+    def apply_pose_detect(self):
+        """Áp dụng nhận dạng tư thế lên ảnh hiện tại"""
+        if self.current_processed_image is None:
+            messagebox.showwarning("Cảnh báo", "Chưa có ảnh để xử lý!")
+            return
+
+        # Nếu đã nhận dạng rồi, quay về ảnh gốc trước khi nhận dạng lại
+        if self.pose_detected:
+            self.current_processed_image = self.current_original_image.copy()
+            self.pose_detected = False
+
+        try:
+            # Tiền xử lý ảnh hiện tại
+            anh_sach = ham_tien_xu_ly(self.current_processed_image)
+            # Nhận dạng tư thế
+            anh_ve_lai, ket_qua_text = pose_detect(anh_sach)
+
+            self.current_processed_image = anh_ve_lai
+            self.pose_detected = True  # Đánh dấu đã nhận dạng
+
+            # Cập nhật hiển thị
+            update_image_on_label(self.widgets['image_label'], anh_ve_lai, self.image_display_size)
+            self.widgets['result_label'].config(text=f"Nhận dạng: {ket_qua_text}")
+
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Lỗi khi nhận dạng tư thế:\n{e}")
+            self.widgets['result_label'].config(text="Lỗi nhận dạng tư thế")
+
+    def reset_params(self):
+        """Đặt lại về ảnh gốc và reset các tham số"""
+        if self.current_original_image is None:
+            messagebox.showwarning("Cảnh báo", "Chưa có ảnh để reset!")
+            return
+
+        # Reset các giá trị về mặc định
+        self.widgets['gamma_entry'].delete(0, tk.END)
+        self.widgets['gamma_entry'].insert(0, "1.0")
+
+        self.widgets['contrast_entry'].delete(0, tk.END)
+        self.widgets['contrast_entry'].insert(0, "1.0")
+
+        self.widgets['brightness_entry'].delete(0, tk.END)
+        self.widgets['brightness_entry'].insert(0, "0")
+
+        # Hiển thị lại ảnh gốc (xóa hình nhận dạng nếu có)
+        self.current_processed_image = self.current_original_image.copy()
+        self.pose_detected = False  # Reset cờ nhận dạng
+
+        update_image_on_label(self.widgets['image_label'], self.current_original_image, self.image_display_size)
+        self.widgets['result_label'].config(text="Đã đặt lại về ảnh gốc")
+
+    # ==================== CÁC HÀM XỬ LÝ CHÍNH ====================
 
     # Xử lý nút 'Tải Ảnh Lên'
     def upload_image(self):
@@ -82,6 +195,11 @@ class PoseApp:
             if anh_goc is None:
                 raise ValueError("Không đọc được file ảnh")
 
+            # Lưu ảnh gốc để xử lý
+            self.current_original_image = anh_goc.copy()
+            self.current_processed_image = anh_goc.copy()
+            self.pose_detected = False  # Reset cờ khi tải ảnh mới
+
             # Xử lý ảnh
             anh_sach = ham_tien_xu_ly(anh_goc)
             anh_ve_lai, ket_qua_text = pose_detect(anh_sach)
@@ -94,6 +212,8 @@ class PoseApp:
             messagebox.showerror("Lỗi Xử Lý Ảnh", f"Lỗi:\n{e}")
             update_image_on_label(self.widgets['image_label'], self.blank_frame, self.image_display_size)
             self.widgets['result_label'].config(text="Lỗi xử lý ảnh.")
+            self.current_original_image = None
+            self.current_processed_image = None
 
     # Xử lý nút 'Bật Camera'
     def start_webcam(self):
@@ -151,6 +271,11 @@ class PoseApp:
         self.stop_webcam(show_blank=False)  # Dừng cam sau khi chụp
 
         try:
+            # Lưu ảnh gốc để xử lý
+            self.current_original_image = frame.copy()
+            self.current_processed_image = frame.copy()
+            self.pose_detected = False  # Reset cờ khi chụp ảnh mới
+
             # Xử lý frame đã chụp
             anh_sach = ham_tien_xu_ly(frame)
             anh_ve_lai, ket_qua_text = pose_detect(anh_sach)
@@ -163,6 +288,8 @@ class PoseApp:
             messagebox.showerror("Lỗi Xử Lý Ảnh Chụp", f"Lỗi:\n{e}")
             update_image_on_label(self.widgets['image_label'], frame, self.image_display_size)
             self.widgets['result_label'].config(text="Lỗi xử lý ảnh chụp.")
+            self.current_original_image = None
+            self.current_processed_image = None
 
     # Vòng lặp cập nhật frame camera
     def update_frame(self):
